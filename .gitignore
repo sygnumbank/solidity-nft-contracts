@@ -1,0 +1,21 @@
+node_modules
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+# Hardhat files
+cache
+artifacts
+
+# Foundry files
+lib
+out
+broadcast
+cache
+flattened
+custom-scripts
+lcov.info
+lib
+script/parsing/Custom.s.sol

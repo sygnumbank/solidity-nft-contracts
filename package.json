@@ -1,0 +1,79 @@
+{
+  "name": "@sygnum/solidity-nft-contracts",
+  "version": "1.0.0",
+  "description": "Solidity NFT contracts used for the Sygnum NFT platform.",
+  "keywords": [
+    "solidity",
+    "ethereum",
+    "smart",
+    "contracts",
+    "security",
+    "nft",
+    "sygnum"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git@gitlab.com:sygnum/blockchain-engineering/ethereum/solidity-nft-contracts.git"
+  },
+  "license": "MIT",
+  "author": "Sygnum Bank AG - Blockchain Engineering <team3301@sygnum.com>",
+  "main": "index.js",
+  "scripts": {
+    "build": "forge build",
+    "coverage": "npx hardhat coverage",
+    "deploy-all": "forge script script/DeployCollection.s.sol --rpc-url $ETHEREUM_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --broadcast --verify --verifier sourcify --chain-id $CHAIN_ID",
+    "deploy-contract": "forge create $CONTRACT_TO_DEPLOY --rpc-url $ETHEREUM_RPC_URL --private-key $ETHEREUM_PRIVATE_KEY --etherscan-api-key $ETHERSCAN_API_KEY --verify --verifier sourcify --chain $ETHEREUM_NETWORK",
+    "lint": "npm run lint:prettier  && npm run lint:solhint",
+    "lint:eslint": "npx eslint 'test/**/*.js' 'config/**/*.js' truffle-config.js index.js",
+    "lint:eslint:fix": "npm run lint:eslint -- --fix",
+    "lint:fix": "npm run lint:prettier:fix && npm run lint:eslint:fix && npm run lint:solhint:fix",
+    "lint:prettier": "npx prettier --check 'contracts/**/*.sol'",
+    "lint:prettier:fix": "npx prettier --write 'contracts/**/*.sol'",
+    "lint:solhint": "npx solhint 'contracts/**/*.sol'",
+    "lint:solhint:fix": "npm run lint:solhint -- --fix",
+    "test": "forge test"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "npx eslint --fix"
+    ],
+    "contracts/**/*.sol": [
+      "npx solhint --fix",
+      "npx prettier --write"
+    ],
+    "package.json": [
+      "npx sort-package-json"
+    ]
+  },
+  "dependencies": {
+    "@rari-capital/solmate": "^6.4.0",
+    "@sygnum/gnosis-safe-proposer": "^1.1.1",
+    "@sygnum/solidity-base-contracts": "^2.3.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^1.0.2",
+    "eslint": "^8.20.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "hardhat": "^2.10.1",
+    "hardhat-storage-layout": "^0.1.7",
+    "husky": "^4.3.8",
+    "lint-staged": "^13.0.3",
+    "prettier": "^2.7.1",
+    "prettier-plugin-solidity": "^1.0.0-dev.23",
+    "sol2uml": "^1.1.29"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "@sygnum:registry": "https://gitlab.com/api/v4/projects/37851449/packages/npm/"
+  }
+}

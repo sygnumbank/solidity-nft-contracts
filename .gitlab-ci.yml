@@ -1,0 +1,284 @@
+include:
+  - project: "sygnum/infra/templates"
+    ref: develop
+    file: "/gitlab/.ethereum-contracts-ci-template.yml"
+
+variables:
+  FRAMEWORK: foundry
+
+stages:
+  - solidity-build
+  - solidity-tests
+  - deploy
+  - upgrade
+  - npm-publish
+
+solidity-build:
+  extends: .solidity-build
+
+solidity-test:
+  extends: .solidity-test
+
+solidity-coverage:
+  extends: .solidity-coverage
+
+solidity-uml:
+  extends: .solidity-uml
+
+code-lint:
+  extends: .code-lint
+
+solidity-mythril:
+  extends: .solidity-mythril
+
+solidity-securify:
+  extends: .solidity-securify
+
+solidity-slither:
+  extends: .solidity-slither
+
+npm-publish:
+  extends: .npm-publish
+  when: manual
+
+.deploy-all-template:
+  extends: .deploy
+  variables:
+    CONTRACT_COLLECTION_MINTER: "0x"
+    CONTRACT_COLLECTION_DEPLOYER: "0x"
+  before_script:
+    - compgen -v | while read line; do if [[ $line == CONTRACT* ]]; then printf "$line=${!line}\n" >> calldata.txt; fi; done
+    # write all variables starting with CONTRACT in calldata.txt
+
+.deploy-collection-implementation-template:
+  extends: .deploy-contract
+  variables:
+    CONTRACT_TO_DEPLOY: "contracts/SygnumERC1155.sol:SygnumERC1155"
+
+.deploy-factory-implementation-template:
+  extends: .deploy-contract
+  variables:
+    CONTRACT_TO_DEPLOY: "contracts/factory/NFTFactoryV2.sol:NFTFactoryV2"
+
+.upgrade-collection-template:
+  extends: .upgrade
+  variables:
+    CONTRACT_PROXY: "0x"
+    CONTRACT_IMPLEMENTATION: "0x"
+
+    CONTRACT_INITIALIZER_VERSION: 2
+    # V2 initializer variables
+    CONTRACT_V2_VARIABLE: 0
+
+  before_script:
+    - export $(compgen -e)
+      # export all variables
+    - forge script script/parsing/SingleCollectionCalldata.s.sol:ParseCalldata
+    - CONTRACT_UPGRADE_DATA=$(<upgradeToAndCall.txt)
+    # run script and read calldata from upgradeToAndCall.txt
+    - compgen -v | while read line; do if [[ $line == CONTRACT* ]]; then printf "$line=${!line}\n" >> calldata.txt; fi; done
+    # write all variables starting with CONTRACT in calldata.txt
+
+.upgrade-factory-template:
+  extends: .upgrade
+  variables:
+    # Factory proxy and implementation addresses
+    CONTRACT_PROXY: "0x"
+    CONTRACT_IMPLEMENTATION: "0x"
+
+    CONTRACT_INITIALIZER_VERSION: 1
+    # V1 initializer variables
+    CONTRACT_COLLECTION_IMPLEMENTATION: "0x"
+    CONTRACT_COLLECTION_ADMIN: "0x'"
+    CONTRACT_FACTORY_BASE_OPERATORS: "0x"
+    # V2 initializer variables
+    CONTRACT_COLLECTION_BASE_OPERATORS: "0x"
+
+  before_script:
+    - export $(compgen -e)
+      # export all variables
+    - forge script script/parsing/FactoryCalldata.s.sol:ParseCalldata
+    - CONTRACT_UPGRADE_DATA=$(<upgradeToAndCall.txt)
+    # run script and read calldata from upgradeToAndCall.txt
+    - compgen -v | while read line; do if [[ $line == CONTRACT* ]]; then printf "$line=${!line}\n" >> calldata.txt; fi; done
+    # write all variables starting with CONTRACT in calldata.txt
+
+.upgrade-all-template:
+  extends: .upgrade-all
+  variables:
+    CONTRACT_FACTORY: "0x"
+    CONTRACT_IMPLEMENTATION: "0x"
+
+    CONTRACT_INITIALIZER_VERSION: 2
+    # V2 initializer variables
+    CONTRACT_V2_VARIABLE: 0
+
+  before_script:
+    - !reference [.read-secrets, script]
+    - !reference [.validate-secrets, script]
+    - export $(compgen -e)
+      # export all variables
+    - forge script script/parsing/AllCollectionsCalldata.s.sol:ParseCalldata --fork-url $ETHEREUM_RPC_URL
+    - CONTRACT_UPGRADE_DATA=$(<upgradeToAndCall.txt)
+    # run script and read calldata from upgradeToAndCall.txt
+    - compgen -v | while read line; do if [[ $line == CONTRACT* ]]; then printf "$line=${!line}\n" >> calldata.txt; fi; done
+    # write all variables starting with CONTRACT in calldata.txt
+
+deploy-all-dev:
+  variables:
+    SECRET_ENV: develop
+    VAULT_ROLE: nft-platform-develop
+
+    CONTRACT_COLLECTION_MINTER: "0x"
+    CONTRACT_COLLECTION_DEPLOYER: "0x"
+  extends: .deploy-all-template
+  tags: !reference [.ft-dev-runner, tags]
+
+deploy-all-tst:
+  variables:
+    SECRET_ENV: staging
+    VAULT_ROLE: nft-platform-staging
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+
+    CONTRACT_COLLECTION_MINTER: "0x"
+    CONTRACT_COLLECTION_DEPLOYER: "0x"
+  extends: .deploy-all-template
+  tags: !reference [.tst-prd-runner, tags]
+
+deploy-all-prd:
+  variables:
+    SECRET_ENV: production
+    VAULT_ROLE: nft-platform-production
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+
+    CONTRACT_COLLECTION_MINTER: "0x"
+    CONTRACT_COLLECTION_DEPLOYER: "0x"
+  extends: .deploy-all-template
+  tags: !reference [.tst-prd-runner, tags]
+
+deploy-collection-implementation-dev:
+  variables:
+    SECRET_ENV: develop
+    VAULT_ROLE: nft-platform-develop
+  extends: .deploy-collection-implementation-template
+  tags: !reference [.ft-dev-runner, tags]
+
+deploy-collection-implementation-tst:
+  variables:
+    SECRET_ENV: staging
+    VAULT_ROLE: nft-platform-staging
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+  extends: .deploy-collection-implementation-template
+  tags: !reference [.tst-prd-runner, tags]
+
+deploy-collection-implementation-prd:
+  variables:
+    SECRET_ENV: production
+    VAULT_ROLE: nft-platform-production
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+  extends: .deploy-collection-implementation-template
+  tags: !reference [.tst-prd-runner, tags]
+
+deploy-factory-implementation-dev:
+  variables:
+    SECRET_ENV: develop
+    VAULT_ROLE: nft-platform-develop
+  extends: .deploy-factory-implementation-template
+  tags: !reference [.ft-dev-runner, tags]
+
+deploy-factory-implementation-tst:
+  variables:
+    SECRET_ENV: staging
+    VAULT_ROLE: nft-platform-staging
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+  extends: .deploy-factory-implementation-template
+  tags: !reference [.tst-prd-runner, tags]
+
+deploy-factory-implementation-prd:
+  variables:
+    SECRET_ENV: production
+    VAULT_ROLE: nft-platform-production
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+  extends: .deploy-factory-implementation-template
+  tags: !reference [.tst-prd-runner, tags]
+
+upgrade-collection-dev:
+  variables:
+    SECRET_ENV: develop
+    VAULT_ROLE: nft-platform-develop
+  extends: .upgrade-collection-template
+  tags: !reference [.ft-dev-runner, tags]
+
+upgrade-collection-tst:
+  variables:
+    SECRET_ENV: staging
+    VAULT_ROLE: nft-platform-staging
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+  extends: .upgrade-collection-template
+  tags: !reference [.tst-prd-runner, tags]
+
+upgrade-collection-prd:
+  variables:
+    SECRET_ENV: production
+    VAULT_ROLE: nft-platform-production
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+  extends: .upgrade-collection-template
+  tags: !reference [.tst-prd-runner, tags]
+
+upgrade-factory-dev:
+  variables:
+    SECRET_ENV: develop
+    VAULT_ROLE: nft-platform-develop
+    CONTRACT_PROXY: "0x071ac1B0CCcAbdD5385a72cb28F14e514c808EA4"
+
+    CONTRACT_FACTORY_BASE_OPERATORS: "0x734Ccad4c895AC29BF673d9DaeD6D4F678e4321C"
+    CONTRACT_COLLECTION_BASE_OPERATORS: "0x5A8bD6aC54525CC491a50e64f69fd9CEa6c38cBB"
+  extends: .upgrade-factory-template
+  tags: !reference [.ft-dev-runner, tags]
+
+upgrade-factory-tst:
+  variables:
+    SECRET_ENV: staging
+    VAULT_ROLE: nft-platform-staging
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+    CONTRACT_PROXY: "0x5006dD7d44dB2495B1b85974c8267677134d5707"
+
+    CONTRACT_FACTORY_BASE_OPERATORS: "0xDF84543445a89fB5B8020B74Cfa4ceA2324e13eD"
+    CONTRACT_COLLECTION_BASE_OPERATORS: "0x5A8bD6aC54525CC491a50e64f69fd9CEa6c38cBB"
+  extends: .upgrade-factory-template
+  tags: !reference [.tst-prd-runner, tags]
+
+upgrade-factory-prd:
+  variables:
+    SECRET_ENV: production
+    VAULT_ROLE: nft-platform-production
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+    CONTRACT_PROXY: "0x55849927525b1D8899d90ad6DE4047Fe58e3929e"
+
+    CONTRACT_FACTORY_BASE_OPERATORS: "0xc0f621f9a57187c9856AC63056D020BBF22aEd01"
+    CONTRACT_COLLECTION_BASE_OPERATORS: "0xaf765BC714c0470bD3f212dCC9733768E11e1F1f"
+  extends: .upgrade-factory-template
+  tags: !reference [.tst-prd-runner, tags]
+
+upgrade-all-dev:
+  variables:
+    SECRET_ENV: develop
+    VAULT_ROLE: nft-platform-develop
+  extends: .upgrade-all-template
+  tags: !reference [.ft-dev-runner, tags]
+
+upgrade-all-tst:
+  variables:
+    SECRET_ENV: staging
+    VAULT_ROLE: nft-platform-staging
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+  extends: .upgrade-all-template
+  tags: !reference [.tst-prd-runner, tags]
+
+upgrade-all-prd:
+  variables:
+    SECRET_ENV: production
+    VAULT_ROLE: nft-platform-production
+    VAULT_ADDR: $PROD_VAULT_ADDRESS
+  extends: .upgrade-all-template
+  tags: !reference [.tst-prd-runner, tags]
